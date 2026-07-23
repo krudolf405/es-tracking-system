@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY apps/frontend/package.json ./apps/frontend/
+
+RUN npm install && npm install @rollup/rollup-linux-x64-musl --no-save
+
+COPY apps/frontend ./apps/frontend
+COPY tsconfig.base.json ./
+
+RUN npm run build -w apps/frontend
+
+CMD ["npm", "run", "preview", "-w", "apps/frontend"]

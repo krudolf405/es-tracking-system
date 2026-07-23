@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1784547209748,
+      "tag": "0000_careless_lady_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784548322956,
+      "tag": "0001_happy_black_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784549721232,
+      "tag": "0002_furry_blizzard",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY apps/backend/package.json ./apps/backend/
+
+RUN npm install
+
+COPY apps/backend ./apps/backend
+COPY tsconfig.base.json ./
+
+RUN npx tsc -p apps/backend/tsconfig.build.json --listEmittedFiles
+
+CMD ["node", "apps/backend/dist/main.js"]
