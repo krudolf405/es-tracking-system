@@ -28,7 +28,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
       <nav className="bg-white shadow-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-6">
-            <Link to={dashboardLink} className="text-xl font-bold text-blue-600">
+            <Link to={dashboardLink} className="text-xl font-bold text-blue-800">
               Exam Tracking System
             </Link>
             <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">

@@ -2,7 +2,7 @@ import { Injectable, Inject, NotFoundException, Logger } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 import * as ExcelJS from 'exceljs';
-import * as PDFKit from 'pdfkit';
+import PDFKit = require('pdfkit');
 import { Readable } from 'stream';
 import { attendance, students, examSessions, examRooms, incidents, users } from '../database/schema';
 

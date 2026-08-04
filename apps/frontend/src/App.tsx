@@ -1,7 +1,8 @@
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
-import HealthCheck from './pages/HealthCheck';
+import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
+import SignUpPage from './pages/SignUpPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import StudentsPage from './pages/admin/StudentsPage';
 import ExamsPage from './pages/admin/ExamsPage';
@@ -18,19 +19,12 @@ function App() {
         path="/"
         element={
           <Layout>
-            <h1 className="text-2xl font-bold">Welcome to Exam Tracking System</h1>
-          </Layout>
-        }
-      />
-      <Route
-        path="/health-check"
-        element={
-          <Layout>
-            <HealthCheck />
+            <HomePage />
           </Layout>
         }
       />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignUpPage />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/students" element={<StudentsPage />} />
       <Route path="/admin/exams" element={<ExamsPage />} />

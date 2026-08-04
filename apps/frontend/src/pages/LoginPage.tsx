@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuthStore } from '../store/authStore';
 
@@ -43,7 +43,16 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
+    <div className="relative flex min-h-screen items-center justify-center bg-gray-100">
+      <Link
+        to="/"
+        className="absolute left-6 top-6 inline-flex items-center gap-1.5 text-sm font-medium text-blue-800 transition hover:text-blue-900"
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Home
+      </Link>
       <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-md">
         <h1 className="mb-6 text-center text-2xl font-bold text-gray-800">
           Exam Tracking System
@@ -65,7 +74,7 @@ function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-800 focus:outline-none"
               placeholder="admin@exam.com"
             />
           </div>
@@ -80,7 +89,7 @@ function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-800 focus:outline-none"
               placeholder="••••••••"
             />
           </div>
@@ -88,7 +97,7 @@ function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+            className="w-full rounded bg-blue-800 px-4 py-2 text-white hover:bg-blue-900 disabled:opacity-50"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>

@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MinLength, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsEnum,
+  IsOptional,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -10,4 +16,12 @@ export class RegisterDto {
 
   @IsEnum(['ADMIN', 'LECTURER', 'INVIGILATOR', 'STUDENT'])
   role!: 'ADMIN' | 'LECTURER' | 'INVIGILATOR' | 'STUDENT';
+
+  @IsOptional()
+  @IsString()
+  fullName?: string;
+
+  @IsOptional()
+  @IsString()
+  matricNumber?: string;
 }

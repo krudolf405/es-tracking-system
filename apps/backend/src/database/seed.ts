@@ -31,10 +31,10 @@ async function seed() {
         role: 'ADMIN',
       })
       .returning({ id: schema.users.id });
-    adminId = admin.id;
+    adminId = admin!.id;
     console.log('Admin user created: admin@example.com / admin123');
   } else {
-    adminId = existingAdmin[0].id;
+    adminId = existingAdmin[0]!.id;
     console.log('Admin user already exists.');
   }
 
@@ -54,10 +54,10 @@ async function seed() {
         role: 'INVIGILATOR',
       })
       .returning({ id: schema.users.id });
-    invigilatorId = invigilator.id;
+    invigilatorId = invigilator!.id;
     console.log('Invigilator created: invigilator@example.com / invig123');
   } else {
-    invigilatorId = existingInvigilator[0].id;
+    invigilatorId = existingInvigilator[0]!.id;
     console.log('Invigilator already exists.');
   }
 
@@ -81,19 +81,19 @@ async function seed() {
     const [student] = await db
       .insert(schema.students)
       .values({
-        userId: studentUser.id,
+        userId: studentUser!.id,
         fullName: 'John Doe',
         matricNumber: 'MAT/2024/001',
         qrCodeHash: 'qr_demo_student_001',
       })
       .returning({ id: schema.students.id });
-    studentId = student.id;
+    studentId = student!.id;
     console.log('Student created: student@example.com / student123');
   } else {
     const [existingStudentRecord] = await db
       .select()
       .from(schema.students)
-      .where(eq(schema.students.userId, existingStudentUser[0].id))
+      .where(eq(schema.students.userId, existingStudentUser[0]!.id))
       .limit(1);
     studentId = existingStudentRecord
       ? existingStudentRecord.id
@@ -101,13 +101,13 @@ async function seed() {
           await db
             .insert(schema.students)
             .values({
-              userId: existingStudentUser[0].id,
+              userId: existingStudentUser[0]!.id,
               fullName: 'John Doe',
               matricNumber: 'MAT/2024/001',
               qrCodeHash: 'qr_demo_student_001',
             })
             .returning({ id: schema.students.id })
-        )[0].id;
+        )[0]!.id;
     console.log('Student already exists.');
   }
 
@@ -127,10 +127,10 @@ async function seed() {
         location: 'Main Campus Building A',
       })
       .returning({ id: schema.examRooms.id });
-    roomId = room.id;
+    roomId = room!.id;
     console.log('Room created: Lecture Hall A');
   } else {
-    roomId = existingRoom[0].id;
+    roomId = existingRoom[0]!.id;
     console.log('Room already exists.');
   }
 
@@ -155,7 +155,7 @@ async function seed() {
       .returning({ id: schema.examSessions.id });
 
     await db.insert(schema.examSessionInvigilators).values({
-      examSessionId: session.id,
+      examSessionId: session!.id,
       userId: invigilatorId,
     });
 

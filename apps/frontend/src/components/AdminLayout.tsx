@@ -28,7 +28,7 @@ function AdminLayout({ children }: AdminLayoutProps) {
     <div className="flex min-h-screen bg-gray-100">
       <aside className="w-64 bg-white shadow-md">
         <div className="p-4">
-          <h1 className="text-lg font-bold text-blue-600">Exam Tracking</h1>
+          <h1 className="text-lg font-bold text-blue-800">Exam Tracking</h1>
           <p className="mt-1 text-xs uppercase tracking-wide text-gray-500">{user.role}</p>
         </div>
         <nav className="mt-2">
@@ -40,7 +40,7 @@ function AdminLayout({ children }: AdminLayoutProps) {
                 to={item.path}
                 className={`block border-l-4 px-4 py-3 text-sm font-medium transition ${
                   isActive
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    ? 'border-blue-800 bg-blue-50 text-blue-900'
                     : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
