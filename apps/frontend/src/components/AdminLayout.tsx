@@ -8,6 +8,7 @@ interface AdminLayoutProps {
 
 const navItems = [
   { label: 'Dashboard', path: '/admin/dashboard' },
+  { label: 'Users', path: '/admin/users' },
   { label: 'Students', path: '/admin/students' },
   { label: 'Examinations', path: '/admin/exams' },
   { label: 'Rooms', path: '/admin/rooms' },
