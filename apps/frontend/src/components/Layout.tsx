@@ -8,7 +8,7 @@ interface LayoutProps {
 
 const dashboardPaths: Record<string, string> = {
   ADMIN: '/admin/dashboard',
-  LECTURER: '/admin/dashboard',
+  LECTURER: '/student/dashboard',
   INVIGILATOR: '/invigilator/dashboard',
   STUDENT: '/student/dashboard',
 };

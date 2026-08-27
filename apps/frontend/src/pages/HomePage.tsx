@@ -97,10 +97,10 @@ const roles = [
     cta: 'Sign up as an Invigilator',
   },
   {
-    name: 'Lecturer / Admin',
-    description: 'Manage exam sessions, rooms, students, and generate official attendance reports.',
-    link: '/signup?role=LECTURER',
-    cta: 'Sign up as a Lecturer',
+    name: 'Administrator',
+    description: 'Manage exam sessions, rooms, students, enrollments, and generate official attendance reports.',
+    link: '/admin/dashboard',
+    cta: 'Go to Admin Dashboard',
   },
 ];
 

@@ -20,13 +20,13 @@ export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post('check-in')
-  @Roles('ADMIN', 'LECTURER', 'INVIGILATOR')
+  @Roles('ADMIN', 'INVIGILATOR')
   checkIn(@Body() dto: CheckInDto) {
     return this.attendanceService.checkIn(dto);
   }
 
   @Post('check-out')
-  @Roles('ADMIN', 'LECTURER', 'INVIGILATOR')
+  @Roles('ADMIN', 'INVIGILATOR')
   checkOut(@Body() dto: CheckOutDto) {
     return this.attendanceService.checkOut(dto);
   }
@@ -37,8 +37,20 @@ export class AttendanceController {
   }
 
   @Get('active-stats')
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   getActiveSessionStats() {
     return this.attendanceService.getActiveSessionStats();
+  }
+
+  @Get('absent-students')
+  @Roles('ADMIN')
+  getAbsentStudents() {
+    return this.attendanceService.getAbsentStudents();
+  }
+
+  @Get('present-students')
+  @Roles('ADMIN')
+  getPresentStudents() {
+    return this.attendanceService.getPresentStudents();
   }
 }

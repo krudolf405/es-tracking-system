@@ -10,6 +10,7 @@ const navItems = [
   { label: 'Dashboard', path: '/admin/dashboard' },
   { label: 'Users', path: '/admin/users' },
   { label: 'Students', path: '/admin/students' },
+  { label: 'Enrollments', path: '/admin/enrollments' },
   { label: 'Examinations', path: '/admin/exams' },
   { label: 'Rooms', path: '/admin/rooms' },
   { label: 'Reports', path: '/admin/reports' },

@@ -29,7 +29,6 @@ const emptyForm: UserForm = {
 
 const roleBadgeColors: Record<string, string> = {
   ADMIN: 'bg-purple-100 text-purple-800',
-  LECTURER: 'bg-indigo-100 text-indigo-800',
   INVIGILATOR: 'bg-blue-100 text-blue-800',
   STUDENT: 'bg-green-100 text-green-800',
 };
@@ -79,7 +78,7 @@ function UsersPage() {
         matricNumber: form.role === 'STUDENT' ? form.matricNumber : undefined,
       });
       setSuccess(
-        `${res.data.role === 'STUDENT' ? 'Student' : res.data.role === 'INVIGILATOR' ? 'Invigilator' : res.data.role === 'LECTURER' ? 'Lecturer' : 'Admin'} account created for ${res.data.email}`,
+        `${res.data.role === 'STUDENT' ? 'Student' : res.data.role === 'INVIGILATOR' ? 'Invigilator' : 'Admin'} account created for ${res.data.email}`,
       );
       setShowModal(false);
       fetchUsers();
@@ -182,7 +181,6 @@ function UsersPage() {
                 >
                   <option value="INVIGILATOR">Invigilator</option>
                   <option value="STUDENT">Student</option>
-                  <option value="LECTURER">Lecturer</option>
                   <option value="ADMIN">Admin</option>
                 </select>
               </div>

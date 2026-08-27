@@ -43,7 +43,7 @@ export class AuthService {
   async register(
     email: string,
     password: string,
-    role: 'ADMIN' | 'LECTURER' | 'INVIGILATOR' | 'STUDENT',
+    role: 'ADMIN' | 'INVIGILATOR' | 'STUDENT',
     fullName?: string,
     matricNumber?: string,
   ): Promise<{ message: string }> {

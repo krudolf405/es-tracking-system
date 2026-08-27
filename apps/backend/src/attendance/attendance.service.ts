@@ -2,11 +2,12 @@ import {
   Injectable,
   Inject,
   NotFoundException,
+  BadRequestException,
   ConflictException,
   Logger,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, sql, and } from 'drizzle-orm';
+import { eq, sql, and, inArray } from 'drizzle-orm';
 import { attendance, students, examSessions } from '../database/schema';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CheckInDto } from './dto/check-in.dto';
@@ -101,13 +102,32 @@ export class AttendanceService {
   }
 
   async checkOut(dto: CheckOutDto) {
+    let studentId: string;
+
+    if (dto.studentId) {
+      studentId = dto.studentId;
+    } else if (dto.qrCodeHash) {
+      const studentsList = await this.db
+        .select()
+        .from(students)
+        .where(eq(students.qrCodeHash, dto.qrCodeHash))
+        .limit(1);
+
+      if (!studentsList.length) {
+        throw new NotFoundException('Student not found for the given QR code');
+      }
+      studentId = studentsList[0]!.id;
+    } else {
+      throw new BadRequestException('Either studentId or qrCodeHash must be provided');
+    }
+
     const records = await this.db
       .select()
       .from(attendance)
       .where(
         and(
           eq(attendance.examSessionId, dto.examSessionId),
-          eq(attendance.studentId, dto.studentId),
+          eq(attendance.studentId, studentId),
         ),
       )
       .limit(1);
@@ -116,13 +136,123 @@ export class AttendanceService {
       throw new NotFoundException('Attendance record not found');
     }
 
+    const now = new Date();
     const [updated] = await this.db
       .update(attendance)
-      .set({ signOutTime: new Date() })
+      .set({ signOutTime: now })
       .where(eq(attendance.id, records[0]!.id))
       .returning();
 
-    return updated;
+    const studentRecord = await this.db
+      .select()
+      .from(students)
+      .where(eq(students.id, studentId))
+      .limit(1);
+
+    const student = studentRecord[0]!;
+
+    const stats = await this.getSessionStats(dto.examSessionId);
+
+    this.realtimeGateway.emitAttendanceUpdated({
+      examSessionId: dto.examSessionId,
+      attendance: {
+        id: updated!.id,
+        studentId: student.id,
+        studentName: student.fullName,
+        matricNumber: student.matricNumber,
+        status: updated!.status,
+        signInTime: updated!.signInTime.toISOString(),
+      },
+      stats,
+    });
+
+    this.logger.log(
+      `Student ${student.fullName} (${student.matricNumber}) checked out from session ${dto.examSessionId}`,
+    );
+
+    return {
+      attendance: updated,
+      student,
+    };
+  }
+
+  async getAbsentStudents() {
+    const activeSessions = await this.db
+      .select()
+      .from(examSessions)
+      .where(eq(examSessions.status, 'ACTIVE'));
+
+    if (!activeSessions.length) {
+      return [];
+    }
+
+    const sessionIds = activeSessions.map((s) => s.id);
+
+    const absentRecords = await this.db
+      .select({
+        examSessionId: attendance.examSessionId,
+        courseName: examSessions.courseName,
+        courseCode: examSessions.courseCode,
+        studentId: attendance.studentId,
+        studentName: students.fullName,
+        matricNumber: students.matricNumber,
+      })
+      .from(attendance)
+      .innerJoin(students, eq(attendance.studentId, students.id))
+      .innerJoin(examSessions, eq(attendance.examSessionId, examSessions.id))
+      .where(
+        and(
+          inArray(attendance.examSessionId, sessionIds),
+          eq(attendance.status, 'ABSENT'),
+        ),
+      );
+
+    return absentRecords;
+  }
+
+  async getPresentStudents() {
+    const activeSessions = await this.db
+      .select()
+      .from(examSessions)
+      .where(eq(examSessions.status, 'ACTIVE'));
+
+    if (!activeSessions.length) {
+      return [];
+    }
+
+    const sessionIds = activeSessions.map((s) => s.id);
+
+    const presentRecords = await this.db
+      .select({
+        examSessionId: attendance.examSessionId,
+        courseName: examSessions.courseName,
+        courseCode: examSessions.courseCode,
+        studentId: attendance.studentId,
+        studentName: students.fullName,
+        matricNumber: students.matricNumber,
+        status: attendance.status,
+        signInTime: attendance.signInTime,
+        signOutTime: attendance.signOutTime,
+      })
+      .from(attendance)
+      .innerJoin(students, eq(attendance.studentId, students.id))
+      .innerJoin(examSessions, eq(attendance.examSessionId, examSessions.id))
+      .where(
+        and(
+          inArray(attendance.examSessionId, sessionIds),
+          inArray(attendance.status, ['PRESENT', 'LATE']),
+        ),
+      );
+
+    return presentRecords;
+  }
+
+  async getAllStudentsWithCount() {
+    const result = await this.db
+      .select({ total: sql<number>`COUNT(*)` })
+      .from(students);
+
+    return { total: Number(result[0]?.total ?? 0) };
   }
 
   async getSessionAttendance(examSessionId: string) {
@@ -151,6 +281,7 @@ export class AttendanceService {
         totalPresent: sql<number>`COUNT(*) FILTER (WHERE ${attendance.status} = 'PRESENT')`,
         totalLate: sql<number>`COUNT(*) FILTER (WHERE ${attendance.status} = 'LATE')`,
         totalAbsent: sql<number>`COUNT(*) FILTER (WHERE ${attendance.status} = 'ABSENT')`,
+        totalSignedOut: sql<number>`COUNT(*) FILTER (WHERE ${attendance.signOutTime} IS NOT NULL)`,
       })
       .from(attendance)
       .where(eq(attendance.examSessionId, examSessionId));
@@ -160,6 +291,7 @@ export class AttendanceService {
       totalPresent: Number(row?.totalPresent ?? 0),
       totalLate: Number(row?.totalLate ?? 0),
       totalAbsent: Number(row?.totalAbsent ?? 0),
+      totalSignedOut: Number(row?.totalSignedOut ?? 0),
       totalExpected:
         Number(row?.totalPresent ?? 0) +
         Number(row?.totalLate ?? 0) +
@@ -180,6 +312,7 @@ export class AttendanceService {
       totalPresent: number;
       totalLate: number;
       totalAbsent: number;
+      totalSignedOut: number;
       totalExpected: number;
     }> = [];
     for (const session of sessions) {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import InvigilatorLayout from './InvigilatorLayout';
 import api from '../../api/axios';
 
@@ -12,24 +13,46 @@ interface ExamSession {
   endTime: string;
   status: string;
   room: { name: string } | null;
+  remarks?: string;
 }
 
 function InvigilatorDashboard() {
   const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [remarksModalSessionId, setRemarksModalSessionId] = useState<string | null>(null);
+  const [remarksText, setRemarksText] = useState('');
+  const [submittingRemarks, setSubmittingRemarks] = useState(false);
 
   useEffect(() => {
-    fetchAssignedSessions();
+    fetchSessions();
   }, []);
 
-  const fetchAssignedSessions = async () => {
+  const fetchSessions = async () => {
     try {
       const res = await api.get<ExamSession[]>('/exam-sessions');
-      setSessions(res.data.filter((s) => s.status === 'ACTIVE' || s.status === 'SCHEDULED'));
+      setSessions(res.data.filter((s) => s.status === 'ACTIVE' || s.status === 'SCHEDULED' || s.status === 'COMPLETED'));
     } catch {
       console.error('Failed to fetch sessions');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const submitRemarks = async () => {
+    if (!remarksModalSessionId || !remarksText.trim()) return;
+    setSubmittingRemarks(true);
+    try {
+      await api.patch(`/exam-sessions/${remarksModalSessionId}/remarks`, {
+        remarks: remarksText,
+      });
+      toast.success('Remarks submitted successfully');
+      setRemarksModalSessionId(null);
+      setRemarksText('');
+      fetchSessions();
+    } catch {
+      toast.error('Failed to submit remarks');
+    } finally {
+      setSubmittingRemarks(false);
     }
   };
 
@@ -77,9 +100,72 @@ function InvigilatorDashboard() {
                 Scan Attendance
               </Link>
             </div>
+            {session.status === 'COMPLETED' && (
+              <div className="mt-3">
+                {session.remarks ? (
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">Remarks:</p>
+                    <p className="text-sm text-gray-700">{session.remarks}</p>
+                    <button
+                      onClick={() => {
+                        setRemarksModalSessionId(session.id);
+                        setRemarksText(session.remarks || '');
+                      }}
+                      className="mt-1 text-xs text-blue-800 hover:underline"
+                    >
+                      Edit Remarks
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setRemarksModalSessionId(session.id);
+                      setRemarksText('');
+                    }}
+                    className="rounded bg-blue-800 px-3 py-1.5 text-xs text-white hover:bg-blue-900"
+                  >
+                    Add Remarks
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
+      {remarksModalSessionId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="mb-4 text-lg font-bold text-gray-800">Session Remarks</h2>
+            <textarea
+              value={remarksText}
+              onChange={(e) => setRemarksText(e.target.value)}
+              rows={4}
+              maxLength={1000}
+              placeholder="Enter overall remarks about this exam session..."
+              className="w-full rounded border px-3 py-2 text-sm focus:border-blue-800 focus:outline-none"
+            />
+            <p className="mt-1 text-xs text-gray-400">{remarksText.length}/1000 characters</p>
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setRemarksModalSessionId(null);
+                  setRemarksText('');
+                }}
+                className="rounded border px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitRemarks}
+                disabled={submittingRemarks || !remarksText.trim()}
+                className="rounded bg-blue-800 px-4 py-2 text-sm text-white hover:bg-blue-900 disabled:opacity-50"
+              >
+                {submittingRemarks ? 'Submitting...' : 'Submit Remarks'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </InvigilatorLayout>
   );
 }

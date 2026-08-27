@@ -22,31 +22,31 @@ export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 
   @Get()
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async findAll() {
     return this.roomsService.findAll();
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.roomsService.findById(id);
   }
 
   @Post()
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async create(@Body() dto: CreateRoomDto) {
     return this.roomsService.create(dto);
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateRoomDto) {
     return this.roomsService.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.roomsService.remove(id);
   }

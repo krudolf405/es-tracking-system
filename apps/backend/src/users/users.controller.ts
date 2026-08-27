@@ -17,19 +17,19 @@ export class UsersController {
   }
 
   @Get()
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async findAll() {
     return this.usersService.findAll();
   }
 
   @Get('invigilators')
-  @Roles('ADMIN', 'LECTURER', 'INVIGILATOR')
+  @Roles('ADMIN', 'INVIGILATOR')
   async getInvigilators() {
     return this.usersService.findInvigilators();
   }
 
   @Post()
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async createUser(@Body() dto: RegisterDto) {
     return this.usersService.createUser({
       email: dto.email,

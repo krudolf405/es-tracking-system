@@ -29,7 +29,7 @@ export class IncidentsController {
   }
 
   @Get('session/:examSessionId')
-  @Roles('ADMIN', 'INVIGILATOR', 'LECTURER')
+  @Roles('ADMIN')
   findBySession(@Param('examSessionId', ParseUUIDPipe) examSessionId: string) {
     return this.incidentsService.findBySession(examSessionId);
   }

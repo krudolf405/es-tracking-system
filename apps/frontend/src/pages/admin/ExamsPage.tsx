@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import api from '../../api/axios';
 
@@ -83,7 +84,7 @@ function ExamsPage() {
 
   const handleCreate = async () => {
     try {
-      await api.post('/exam-sessions', form);
+      const res = await api.post('/exam-sessions', form);
       setShowModal(false);
       setForm({
         courseName: '',
@@ -95,6 +96,13 @@ function ExamsPage() {
         invigilatorIds: [],
       });
       fetchExams();
+      if (res.data.capacityWarning) {
+        const w = res.data.capacityWarning;
+        toast.warning(
+          `Room capacity exceeded: ${w.enrolledStudents} students enrolled but room holds ${w.roomCapacity}. ${w.excess} students need overflow seating. Available rooms: ${w.availableRooms.map((r: {name: string, capacity: string}) => `${r.name} (cap: ${r.capacity})`).join(', ') || 'none'}`,
+          { duration: 10000 }
+        );
+      }
     } catch (err) {
       console.error('Failed to create exam', err);
     }

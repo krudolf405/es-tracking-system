@@ -34,7 +34,7 @@ export class UsersService {
   async createUser(data: {
     email: string;
     password: string;
-    role: 'ADMIN' | 'LECTURER' | 'INVIGILATOR' | 'STUDENT';
+    role: 'ADMIN' | 'INVIGILATOR' | 'STUDENT';
     fullName?: string;
     matricNumber?: string;
   }) {

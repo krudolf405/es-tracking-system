@@ -18,7 +18,7 @@ export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   @Get('attendance/:examSessionId/excel')
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async getAttendanceExcel(
     @Param('examSessionId', ParseUUIDPipe) examSessionId: string,
     @Res() res: Response,
@@ -30,7 +30,7 @@ export class ReportsController {
   }
 
   @Get('attendance/:examSessionId/pdf')
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async getAttendancePdf(
     @Param('examSessionId', ParseUUIDPipe) examSessionId: string,
     @Res() res: Response,
@@ -42,7 +42,7 @@ export class ReportsController {
   }
 
   @Get('incidents/:examSessionId/pdf')
-  @Roles('ADMIN', 'LECTURER')
+  @Roles('ADMIN')
   async getIncidentsPdf(
     @Param('examSessionId', ParseUUIDPipe) examSessionId: string,
     @Res() res: Response,

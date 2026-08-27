@@ -22,6 +22,7 @@ interface Attendee {
   matricNumber: string;
   status: string;
   signInTime: string;
+  signOutTime: string | null;
 }
 
 interface ScanFeedback {
@@ -48,6 +49,7 @@ function ScanAttendance() {
   const [incidentDescription, setIncidentDescription] = useState('');
   const [incidentStudentId, setIncidentStudentId] = useState('');
   const [submittingIncident, setSubmittingIncident] = useState(false);
+  const [scanMode, setScanMode] = useState<'signin' | 'signout'>('signin');
 
   useEffect(() => {
     fetchSessions();
@@ -65,6 +67,12 @@ function ScanAttendance() {
       return () => clearTimeout(timer);
     }
   }, [feedback]);
+
+  useEffect(() => {
+    if (scanning) {
+      stopScanner();
+    }
+  }, [scanMode]);
 
   const fetchSessions = async () => {
     try {
@@ -108,21 +116,25 @@ function ScanAttendance() {
 
   const handleScan = async (qrCodeHash: string) => {
     try {
-      const res = await api.post('/attendance/check-in', {
-        examSessionId: selectedSessionId,
-        qrCodeHash,
-      });
-      const { student, status } = res.data;
-      setFeedback({ type: 'success', message: `Checked In: ${student.fullName} (${status})` });
+      if (scanMode === 'signin') {
+        const res = await api.post('/attendance/check-in', {
+          examSessionId: selectedSessionId,
+          qrCodeHash,
+        });
+        const { student, status } = res.data;
+        setFeedback({ type: 'success', message: `Signed In: ${student.fullName} (${status})` });
+      } else {
+        const res = await api.post('/attendance/check-out', {
+          examSessionId: selectedSessionId,
+          qrCodeHash,
+        });
+        const { student } = res.data;
+        setFeedback({ type: 'success', message: `Signed Out: ${student.fullName}` });
+      }
       fetchAttendees(selectedSessionId);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      const msg =
-        axiosErr?.response?.data?.message === 'Student is already checked in for this session'
-          ? 'Already Checked In'
-          : axiosErr?.response?.data?.message === 'Student not found for the given QR code'
-            ? 'Student Not Found'
-            : 'Scan Error';
+      const msg = axiosErr?.response?.data?.message || 'Scan Error';
       setFeedback({ type: 'error', message: msg });
     } finally {
       setTimeout(() => {
@@ -240,6 +252,24 @@ function ScanAttendance() {
       {selectedSessionId && (
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-lg border bg-white p-6 shadow">
+            <div className="mb-4 flex rounded-lg border bg-gray-100 p-1">
+              <button
+                onClick={() => setScanMode('signin')}
+                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+                  scanMode === 'signin' ? 'bg-blue-800 text-white shadow' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => setScanMode('signout')}
+                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+                  scanMode === 'signout' ? 'bg-orange-600 text-white shadow' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Sign Out
+              </button>
+            </div>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-800">QR Scanner</h2>
               {!scanning ? (
@@ -271,17 +301,14 @@ function ScanAttendance() {
 
           <div className="rounded-lg border bg-white p-6 shadow">
             <h2 className="mb-4 text-lg font-bold text-gray-800">
-              Checked In Students ({attendees.length})
+              Students ({attendees.length})
             </h2>
             {attendees.length === 0 ? (
               <p className="text-sm text-gray-400">No students checked in yet.</p>
             ) : (
               <div className="max-h-96 space-y-2 overflow-y-auto">
                 {attendees.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between rounded bg-gray-50 p-3 text-sm"
-                  >
+                  <div key={a.id} className="flex items-center justify-between rounded bg-gray-50 p-3 text-sm">
                     <div>
                       <p className="font-medium text-gray-800">{a.studentName}</p>
                       <p className="text-xs text-gray-500">{a.matricNumber}</p>
@@ -289,8 +316,23 @@ function ScanAttendance() {
                     <div className="text-right">
                       {statusBadge(a.status)}
                       <p className="mt-1 text-xs text-gray-400">
-                        {new Date(a.signInTime).toLocaleTimeString()}
+                        In: {new Date(a.signInTime).toLocaleTimeString()}
                       </p>
+                      {a.signOutTime ? (
+                        <p className="text-xs text-gray-400">
+                          Out: {new Date(a.signOutTime).toLocaleTimeString()}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-400">Out: —</p>
+                      )}
+                      <div className="mt-1 h-1.5 w-full rounded-full bg-gray-200">
+                        <div
+                          className={`h-1.5 rounded-full ${
+                            a.signOutTime ? 'bg-green-500' : 'bg-blue-800'
+                          }`}
+                          style={{ width: a.signOutTime ? '100%' : '50%' }}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

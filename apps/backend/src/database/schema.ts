@@ -79,6 +79,7 @@ export const examSessions = pgTable('exam_sessions', {
     .notNull()
     .references(() => examRooms.id, { onDelete: 'restrict' }),
   status: sessionStatusEnum('status').notNull().default('SCHEDULED'),
+  remarks: varchar('remarks', { length: 1000 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -144,3 +145,24 @@ export type ExamSessionInvigilator = typeof examSessionInvigilators.$inferSelect
 export type NewExamSessionInvigilator = typeof examSessionInvigilators.$inferInsert;
 export type Attendance = typeof attendance.$inferSelect;
 export type NewAttendance = typeof attendance.$inferInsert;
+
+export const courseEnrollments = pgTable(
+  'course_enrollments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    courseCode: varchar('course_code', { length: 50 }).notNull(),
+    enrolledAt: timestamp('enrolled_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    studentCourseIdx: uniqueIndex('student_course_idx').on(
+      table.studentId,
+      table.courseCode,
+    ),
+  }),
+);
+
+export type CourseEnrollment = typeof courseEnrollments.$inferSelect;
+export type NewCourseEnrollment = typeof courseEnrollments.$inferInsert;

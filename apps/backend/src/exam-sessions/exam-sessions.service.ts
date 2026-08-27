@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import * as schema from '../database/schema';
 
 @Injectable()
@@ -65,7 +65,8 @@ export class ExamSessionsService {
       );
     }
 
-    return this.findById(session!.id);
+    const capacityWarning = await this.checkCapacity(data.courseCode, data.roomId);
+    return { session: await this.findById(session!.id), capacityWarning };
   }
 
   async findAll() {
@@ -149,6 +150,7 @@ export class ExamSessionsService {
     endTime: string;
     roomId: string;
     status: string;
+    remarks?: string;
     invigilatorIds?: string[];
   }>) {
     const [existing] = await this.db
@@ -180,6 +182,7 @@ export class ExamSessionsService {
     if (data.endTime) updateData.endTime = data.endTime;
     if (data.roomId) updateData.roomId = data.roomId;
     if (data.status) updateData.status = data.status;
+    if (data.remarks !== undefined) updateData.remarks = data.remarks;
 
     if (Object.keys(updateData).length > 0) {
       await this.db
@@ -204,5 +207,74 @@ export class ExamSessionsService {
     }
 
     return this.findById(id);
+  }
+
+  async updateRemarks(id: string, remarks: string) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.examSessions)
+      .where(eq(schema.examSessions.id, id))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Exam session not found');
+    await this.db.update(schema.examSessions).set({ remarks }).where(eq(schema.examSessions.id, id));
+    return this.findById(id);
+  }
+
+  async checkCapacity(courseCode: string, roomId: string) {
+    const countResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.courseEnrollments)
+      .where(eq(schema.courseEnrollments.courseCode, courseCode));
+
+    const enrolledCount = Number(countResult[0]?.count ?? 0);
+
+    const [room] = await this.db
+      .select()
+      .from(schema.examRooms)
+      .where(eq(schema.examRooms.id, roomId))
+      .limit(1);
+
+    if (!room) return null;
+
+    const roomCapacity = parseInt(room.capacity, 10);
+
+    if (enrolledCount > roomCapacity) {
+      const allRooms = await this.db.select().from(schema.examRooms);
+
+      const availableRooms: Array<{
+        id: string;
+        name: string;
+        capacity: string;
+        location: string;
+        sessionCount: number;
+      }> = [];
+
+      for (const r of allRooms) {
+        if (r.id === roomId) continue;
+        const scResult = await this.db
+          .select({ count: sql<number>`count(*)` })
+          .from(schema.examSessions)
+          .where(eq(schema.examSessions.roomId, r.id));
+        const sessionCount = Number(scResult[0]?.count ?? 0);
+        if (sessionCount < parseInt(r.capacity, 10)) {
+          availableRooms.push({
+            id: r.id,
+            name: r.name,
+            capacity: r.capacity,
+            location: r.location,
+            sessionCount,
+          });
+        }
+      }
+
+      return {
+        enrolledStudents: enrolledCount,
+        roomCapacity,
+        excess: enrolledCount - roomCapacity,
+        availableRooms,
+      };
+    }
+
+    return null;
   }
 }

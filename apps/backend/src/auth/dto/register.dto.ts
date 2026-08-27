@@ -14,8 +14,8 @@ export class RegisterDto {
   @MinLength(6)
   password!: string;
 
-  @IsEnum(['ADMIN', 'LECTURER', 'INVIGILATOR', 'STUDENT'])
-  role!: 'ADMIN' | 'LECTURER' | 'INVIGILATOR' | 'STUDENT';
+  @IsEnum(['ADMIN', 'INVIGILATOR', 'STUDENT'])
+  role!: 'ADMIN' | 'INVIGILATOR' | 'STUDENT';
 
   @IsOptional()
   @IsString()

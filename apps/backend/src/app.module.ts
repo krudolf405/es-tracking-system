@@ -11,6 +11,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { IncidentsModule } from './incidents/incidents.module';
 import { ReportsModule } from './reports/reports.module';
+import { EnrollmentsModule } from './enrollments/enrollments.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ReportsModule } from './reports/reports.module';
     AttendanceModule,
     IncidentsModule,
     ReportsModule,
+    EnrollmentsModule,
   ],
   controllers: [AppController],
 })

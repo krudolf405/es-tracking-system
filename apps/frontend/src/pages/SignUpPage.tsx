@@ -5,7 +5,6 @@ import api from '../api/axios';
 const roleLabels: Record<string, string> = {
   STUDENT: 'Student',
   INVIGILATOR: 'Invigilator',
-  LECTURER: 'Lecturer',
 };
 
 function SignUpPage() {
@@ -113,7 +112,6 @@ function SignUpPage() {
             >
               <option value="STUDENT">Student</option>
               <option value="INVIGILATOR">Invigilator</option>
-              <option value="LECTURER">Lecturer</option>
             </select>
           </div>
 

@@ -117,6 +117,19 @@ export class ReportsService {
       y += 20;
     }
 
+    if (session.remarks) {
+      const remarksY = doc.y + 20;
+      if (remarksY > 650) {
+        doc.addPage();
+      }
+      doc.fontSize(12).font('Helvetica-Bold').text('Invigilator Remarks:', 50, doc.y + 10);
+      doc.moveDown(0.5);
+      doc.fontSize(10).font('Helvetica').text(session.remarks, 50, doc.y, {
+        width: 500,
+        align: 'left',
+      });
+    }
+
     doc.end();
     return { stream: doc, filename };
   }
