@@ -29,7 +29,23 @@ interface ExamSession {
   endTime: string;
   room: Room | null;
   invigilators: Invigilator[];
+  overflowRooms?: Room[];
   status: string;
+}
+
+interface AvailableRoom {
+  id: string;
+  name: string;
+  capacity: string;
+  location: string;
+  sessionCount: number;
+}
+
+interface CapacityWarning {
+  enrolledStudents: number;
+  roomCapacity: number;
+  excess: number;
+  availableRooms: AvailableRoom[];
 }
 
 function ExamsPage() {
@@ -47,6 +63,13 @@ function ExamsPage() {
     roomId: '',
     invigilatorIds: [] as string[],
   });
+  const [overflowModal, setOverflowModal] = useState<{
+    sessionId: string;
+    warning: CapacityWarning;
+  } | null>(null);
+  const [selectedOverflowRooms, setSelectedOverflowRooms] = useState<string[]>([]);
+  const [selectedInvigilators, setSelectedInvigilators] = useState<string[]>([]);
+  const [allocationSaving, setAllocationSaving] = useState(false);
 
   useEffect(() => {
     Promise.all([fetchExams(), fetchRooms(), fetchInvigilators()]);
@@ -86,6 +109,7 @@ function ExamsPage() {
     try {
       const res = await api.post('/exam-sessions', form);
       setShowModal(false);
+      const createdSessionId = res.data.session?.id;
       setForm({
         courseName: '',
         courseCode: '',
@@ -96,16 +120,60 @@ function ExamsPage() {
         invigilatorIds: [],
       });
       fetchExams();
-      if (res.data.capacityWarning) {
-        const w = res.data.capacityWarning;
-        toast.warning(
-          `Room capacity exceeded: ${w.enrolledStudents} students enrolled but room holds ${w.roomCapacity}. ${w.excess} students need overflow seating. Available rooms: ${w.availableRooms.map((r: {name: string, capacity: string}) => `${r.name} (cap: ${r.capacity})`).join(', ') || 'none'}`,
-          { duration: 10000 }
-        );
+      if (res.data.capacityWarning && createdSessionId) {
+        setSelectedOverflowRooms(res.data.capacityWarning.availableRooms.map((r: AvailableRoom) => r.id));
+        setSelectedInvigilators(form.invigilatorIds);
+        setOverflowModal({
+          sessionId: createdSessionId,
+          warning: res.data.capacityWarning as CapacityWarning,
+        });
       }
     } catch (err) {
       console.error('Failed to create exam', err);
     }
+  };
+
+  const openOverflowModal = async (session: ExamSession, warning?: CapacityWarning) => {
+    let capWarning: CapacityWarning | undefined = warning;
+    if (!capWarning) {
+      try {
+        const res = await api.get<CapacityWarning>(`/exam-sessions/${session.id}/capacity`);
+        capWarning = res.data;
+      } catch {
+        capWarning = undefined;
+      }
+    }
+    if (!capWarning) {
+      toast.info('This session is within room capacity — no overflow room needed.');
+      return;
+    }
+    setSelectedOverflowRooms(capWarning.availableRooms.map((r) => r.id));
+    setSelectedInvigilators(session.invigilators?.map((i) => i.id) ?? []);
+    setOverflowModal({ sessionId: session.id, warning: capWarning });
+  };
+
+  const saveOverflowAllocation = async () => {
+    if (!overflowModal) return;
+    setAllocationSaving(true);
+    try {
+      await api.patch(`/exam-sessions/${overflowModal.sessionId}/overflow-rooms`, {
+        overflowRoomIds: selectedOverflowRooms,
+        invigilatorIds: selectedInvigilators,
+      });
+      toast.success('Overflow room allocated with invigilators');
+      setOverflowModal(null);
+      fetchExams();
+    } catch {
+      toast.error('Failed to allocate overflow room');
+    } finally {
+      setAllocationSaving(false);
+    }
+  };
+
+  const toggleOverflowRoom = (id: string) => {
+    setSelectedOverflowRooms((prev) =>
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id],
+    );
   };
 
   const toggleInvigilator = (id: string) => {
@@ -115,6 +183,12 @@ function ExamsPage() {
         ? prev.invigilatorIds.filter((i) => i !== id)
         : [...prev.invigilatorIds, id],
     }));
+  };
+
+  const toggleAllocInvigilator = (id: string) => {
+    setSelectedInvigilators((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
   };
 
   const statusBadge = (status: string) => {
@@ -152,6 +226,7 @@ function ExamsPage() {
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Time</th>
               <th className="px-4 py-3">Room</th>
+              <th className="px-4 py-3">Overflow</th>
               <th className="px-4 py-3">Invigilators</th>
               <th className="px-4 py-3">Status</th>
             </tr>
@@ -159,14 +234,14 @@ function ExamsPage() {
           <tbody className="divide-y divide-gray-100">
             {loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                   Loading...
                 </td>
               </tr>
             )}
             {!loading && exams.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                   No exams scheduled.
                 </td>
               </tr>
@@ -180,6 +255,29 @@ function ExamsPage() {
                   {exam.startTime} - {exam.endTime}
                 </td>
                 <td className="px-4 py-3">{exam.room?.name || '—'}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-1">
+                    {exam.overflowRooms && exam.overflowRooms.length > 0 ? (
+                      exam.overflowRooms.map((r) => (
+                        <span
+                          key={r.id}
+                          className="rounded bg-teal-100 px-2 py-0.5 text-xs text-teal-700"
+                        >
+                          {r.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                    <button
+                      onClick={() => openOverflowModal(exam)}
+                      className="ml-1 rounded border border-teal-600 px-2 py-0.5 text-xs text-teal-700 hover:bg-teal-50"
+                      title="Allocate overflow room with invigilators"
+                    >
+                      Assign
+                    </button>
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
                     {exam.invigilators.length > 0
@@ -289,6 +387,81 @@ function ExamsPage() {
                 className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
               >
                 Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Allocate Overflow Room Modal */}
+      {overflowModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="mb-2 text-lg font-bold">Allocate Overflow Room</h2>
+            <p className="mb-4 text-sm text-gray-600">
+              Room capacity exceeded. {overflowModal.warning.enrolledStudents} students
+              are enrolled but the room holds {overflowModal.warning.roomCapacity}. Assign
+              additional room(s) and confirm invigilators below.
+            </p>
+
+            <p className="mb-1 text-sm font-medium text-gray-700">
+              Select Overflow Room(s)
+            </p>
+            {overflowModal.warning.availableRooms.length === 0 ? (
+              <p className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-700">
+                No available overflow rooms found. Contact an administrator to add more rooms.
+              </p>
+            ) : (
+              <div className="mb-4 max-h-32 space-y-1 overflow-y-auto rounded border p-2">
+                {overflowModal.warning.availableRooms.map((r) => (
+                  <label key={r.id} className="flex items-center space-x-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selectedOverflowRooms.includes(r.id)}
+                      onChange={() => toggleOverflowRoom(r.id)}
+                      className="rounded"
+                    />
+                    <span>
+                      {r.name} (cap: {r.capacity}) - {r.location}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <p className="mb-1 text-sm font-medium text-gray-700">Invigilators</p>
+            <div className="mb-4 max-h-32 space-y-1 overflow-y-auto rounded border p-2">
+              {invigilators.length === 0 && (
+                <p className="text-xs text-gray-400">
+                  No invigilators available. Add users with INVIGILATOR role.
+                </p>
+              )}
+              {invigilators.map((inv) => (
+                <label key={inv.id} className="flex items-center space-x-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedInvigilators.includes(inv.id)}
+                    onChange={() => toggleAllocInvigilator(inv.id)}
+                    className="rounded"
+                  />
+                  <span>{inv.email}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="mt-4 flex justify-end space-x-3">
+              <button
+                onClick={() => setOverflowModal(null)}
+                className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveOverflowAllocation}
+                disabled={allocationSaving}
+                className="rounded bg-teal-600 px-4 py-2 text-sm text-white hover:bg-teal-700 disabled:opacity-50"
+              >
+                {allocationSaving ? 'Allocating...' : 'Allocate Room'}
               </button>
             </div>
           </div>

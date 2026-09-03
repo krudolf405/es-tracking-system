@@ -8,7 +8,12 @@ import {
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, sql, and, inArray } from 'drizzle-orm';
-import { attendance, students, examSessions } from '../database/schema';
+import {
+  attendance,
+  students,
+  examSessions,
+  courseEnrollments,
+} from '../database/schema';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
@@ -186,28 +191,56 @@ export class AttendanceService {
       return [];
     }
 
-    const sessionIds = activeSessions.map((s) => s.id);
+    const results: Array<{
+      examSessionId: string;
+      courseName: string;
+      courseCode: string;
+      studentId: string;
+      studentName: string;
+      matricNumber: string;
+    }> = [];
 
-    const absentRecords = await this.db
-      .select({
-        examSessionId: attendance.examSessionId,
-        courseName: examSessions.courseName,
-        courseCode: examSessions.courseCode,
-        studentId: attendance.studentId,
-        studentName: students.fullName,
-        matricNumber: students.matricNumber,
-      })
-      .from(attendance)
-      .innerJoin(students, eq(attendance.studentId, students.id))
-      .innerJoin(examSessions, eq(attendance.examSessionId, examSessions.id))
-      .where(
-        and(
-          inArray(attendance.examSessionId, sessionIds),
-          eq(attendance.status, 'ABSENT'),
-        ),
+    for (const session of activeSessions) {
+      const attended = await this.db
+        .select({ studentId: attendance.studentId })
+        .from(attendance)
+        .where(eq(attendance.examSessionId, session.id));
+
+      const attendedIds = attended.map((a) => a.studentId);
+
+      const enrolled = await this.db
+        .select({ studentId: courseEnrollments.studentId })
+        .from(courseEnrollments)
+        .where(eq(courseEnrollments.courseCode, session.courseCode));
+
+      const absentEnrolled = enrolled.filter(
+        (e) => !attendedIds.includes(e.studentId),
       );
 
-    return absentRecords;
+      if (absentEnrolled.length === 0) continue;
+
+      const absentStudents = await this.db
+        .select({
+          id: students.id,
+          fullName: students.fullName,
+          matricNumber: students.matricNumber,
+        })
+        .from(students)
+        .where(inArray(students.id, absentEnrolled.map((a) => a.studentId)));
+
+      for (const s of absentStudents) {
+        results.push({
+          examSessionId: session.id,
+          courseName: session.courseName,
+          courseCode: session.courseCode,
+          studentId: s.id,
+          studentName: s.fullName,
+          matricNumber: s.matricNumber,
+        });
+      }
+    }
+
+    return results;
   }
 
   async getPresentStudents() {
@@ -276,26 +309,44 @@ export class AttendanceService {
   }
 
   async getSessionStats(examSessionId: string) {
+    const [session] = await this.db
+      .select()
+      .from(examSessions)
+      .where(eq(examSessions.id, examSessionId))
+      .limit(1);
+
     const result = await this.db
       .select({
         totalPresent: sql<number>`COUNT(*) FILTER (WHERE ${attendance.status} = 'PRESENT')`,
         totalLate: sql<number>`COUNT(*) FILTER (WHERE ${attendance.status} = 'LATE')`,
-        totalAbsent: sql<number>`COUNT(*) FILTER (WHERE ${attendance.status} = 'ABSENT')`,
         totalSignedOut: sql<number>`COUNT(*) FILTER (WHERE ${attendance.signOutTime} IS NOT NULL)`,
       })
       .from(attendance)
       .where(eq(attendance.examSessionId, examSessionId));
 
     const row = result[0];
+    const totalPresent = Number(row?.totalPresent ?? 0);
+    const totalLate = Number(row?.totalLate ?? 0);
+    const totalSignedOut = Number(row?.totalSignedOut ?? 0);
+
+    let totalExpected = totalPresent + totalLate;
+    if (session) {
+      const countResult = await this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(courseEnrollments)
+        .where(eq(courseEnrollments.courseCode, session.courseCode));
+      totalExpected = Math.max(
+        totalPresent + totalLate,
+        Number(countResult[0]?.count ?? 0),
+      );
+    }
+
     return {
-      totalPresent: Number(row?.totalPresent ?? 0),
-      totalLate: Number(row?.totalLate ?? 0),
-      totalAbsent: Number(row?.totalAbsent ?? 0),
-      totalSignedOut: Number(row?.totalSignedOut ?? 0),
-      totalExpected:
-        Number(row?.totalPresent ?? 0) +
-        Number(row?.totalLate ?? 0) +
-        Number(row?.totalAbsent ?? 0),
+      totalPresent,
+      totalLate,
+      totalAbsent: Math.max(0, totalExpected - totalPresent - totalLate),
+      totalSignedOut,
+      totalExpected,
     };
   }
 

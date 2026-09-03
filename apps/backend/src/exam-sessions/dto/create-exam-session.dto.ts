@@ -28,4 +28,9 @@ export class CreateExamSessionDto {
   @IsUUID('4', { each: true })
   @IsOptional()
   invigilatorIds?: string[];
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  overflowRoomIds?: string[];
 }

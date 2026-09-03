@@ -22,6 +22,7 @@ export class ExamSessionsService {
     endTime: string;
     roomId: string;
     invigilatorIds?: string[];
+    overflowRoomIds?: string[];
   }) {
     const [room] = await this.db
       .select()
@@ -65,6 +66,10 @@ export class ExamSessionsService {
       );
     }
 
+    if (data.overflowRoomIds?.length) {
+      await this.addOverflowRooms(session!.id, data.overflowRoomIds);
+    }
+
     const capacityWarning = await this.checkCapacity(data.courseCode, data.roomId);
     return { session: await this.findById(session!.id), capacityWarning };
   }
@@ -100,6 +105,7 @@ export class ExamSessionsService {
         ...session,
         room,
         invigilators,
+        overflowRooms: await this.getOverflowRooms(session.id),
       });
     }
 
@@ -139,6 +145,7 @@ export class ExamSessionsService {
       ...session,
       room: room || null,
       invigilators,
+      overflowRooms: await this.getOverflowRooms(session.id),
     };
   }
 
@@ -276,5 +283,104 @@ export class ExamSessionsService {
     }
 
     return null;
+  }
+
+  private async getOverflowRooms(sessionId: string) {
+    const links = await this.db
+      .select()
+      .from(schema.examSessionRooms)
+      .where(eq(schema.examSessionRooms.examSessionId, sessionId));
+
+    if (links.length === 0) return [];
+
+    return this.db
+      .select()
+      .from(schema.examRooms)
+      .where(inArray(schema.examRooms.id, links.map((l) => l.roomId)));
+  }
+
+  private async addOverflowRooms(sessionId: string, roomIds: string[]) {
+    const rooms = await this.db
+      .select()
+      .from(schema.examRooms)
+      .where(inArray(schema.examRooms.id, roomIds));
+
+    if (rooms.length !== roomIds.length) {
+      throw new BadRequestException('One or more overflow room IDs are invalid');
+    }
+
+    const existingLinks = await this.db
+      .select()
+      .from(schema.examSessionRooms)
+      .where(eq(schema.examSessionRooms.examSessionId, sessionId));
+    const existingRoomIds = existingLinks.map((l) => l.roomId);
+
+    const toInsert = roomIds
+      .filter((roomId) => !existingRoomIds.includes(roomId))
+      .map((roomId) => ({
+        examSessionId: sessionId,
+        roomId,
+      }));
+
+    if (toInsert.length > 0) {
+      await this.db.insert(schema.examSessionRooms).values(toInsert);
+    }
+  }
+
+  async getCapacity(id: string) {
+    const [session] = await this.db
+      .select()
+      .from(schema.examSessions)
+      .where(eq(schema.examSessions.id, id))
+      .limit(1);
+
+    if (!session) {
+      throw new NotFoundException('Exam session not found');
+    }
+
+    return this.checkCapacity(session.courseCode, session.roomId);
+  }
+
+  async allocateOverflowRooms(
+    id: string,
+    data: { overflowRoomIds?: string[]; invigilatorIds?: string[] },
+  ) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.examSessions)
+      .where(eq(schema.examSessions.id, id))
+      .limit(1);
+
+    if (!existing) {
+      throw new NotFoundException('Exam session not found');
+    }
+
+    if (data.overflowRoomIds?.length) {
+      await this.addOverflowRooms(id, data.overflowRoomIds);
+    }
+
+    if (data.invigilatorIds) {
+      await this.db
+        .delete(schema.examSessionInvigilators)
+        .where(eq(schema.examSessionInvigilators.examSessionId, id));
+
+      if (data.invigilatorIds.length > 0) {
+        const invigilators = await this.db
+          .select()
+          .from(schema.users)
+          .where(inArray(schema.users.id, data.invigilatorIds));
+        if (invigilators.length !== data.invigilatorIds.length) {
+          throw new BadRequestException('One or more invigilator IDs are invalid');
+        }
+        await this.db.insert(schema.examSessionInvigilators).values(
+          data.invigilatorIds.map((userId) => ({
+            examSessionId: id,
+            userId,
+          })),
+        );
+      }
+    }
+
+    return this.findById(id);
   }
 }

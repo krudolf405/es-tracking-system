@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:all": "npx tsx src/database/migrate-all.ts",
     "db:seed": "npx tsx src/database/seed.ts"
   },
   "dependencies": {

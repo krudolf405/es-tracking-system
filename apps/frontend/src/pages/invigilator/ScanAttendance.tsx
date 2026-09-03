@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Toaster, toast } from 'sonner';
 import InvigilatorLayout from './InvigilatorLayout';
@@ -51,6 +51,19 @@ function ScanAttendance() {
   const [submittingIncident, setSubmittingIncident] = useState(false);
   const [scanMode, setScanMode] = useState<'signin' | 'signout'>('signin');
 
+  const stopScanner = useCallback(async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        await html5QrCodeRef.current.stop();
+        html5QrCodeRef.current.clear();
+      } catch {
+        /* ignore cleanup errors */
+      }
+      html5QrCodeRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
   useEffect(() => {
     fetchSessions();
   }, []);
@@ -72,7 +85,7 @@ function ScanAttendance() {
     if (scanning) {
       stopScanner();
     }
-  }, [scanMode]);
+  }, [scanMode, scanning, stopScanner]);
 
   const fetchSessions = async () => {
     try {
@@ -167,24 +180,11 @@ function ScanAttendance() {
     }
   };
 
-  const stopScanner = async () => {
-    if (html5QrCodeRef.current) {
-      try {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current.clear();
-      } catch {
-        /* ignore cleanup errors */
-      }
-      html5QrCodeRef.current = null;
-    }
-    setScanning(false);
-  };
-
   useEffect(() => {
     return () => {
       stopScanner();
     };
-  }, []);
+  }, [stopScanner]);
 
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {

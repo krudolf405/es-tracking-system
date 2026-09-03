@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import * as schema from './schema';
 
 async function seed() {
@@ -11,158 +11,194 @@ async function seed() {
 
   const db = drizzle(pool, { schema });
 
-  const passwordHash = await bcrypt.hash('admin123', 12);
+  const adminHash = await bcrypt.hash('admin123', 12);
   const invigilatorHash = await bcrypt.hash('invig123', 12);
   const studentHash = await bcrypt.hash('student123', 12);
 
-  const existingAdmin = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, 'admin@example.com'))
-    .limit(1);
-
-  let adminId: string;
-  if (existingAdmin.length === 0) {
-    const [admin] = await db
+  async function ensureUser(
+    email: string,
+    passwordHash: string,
+    role: schema.User['role'],
+  ) {
+    const [existing] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+    if (existing) return existing;
+    const [created] = await db
       .insert(schema.users)
-      .values({
-        email: 'admin@example.com',
-        passwordHash,
-        role: 'ADMIN',
-      })
-      .returning({ id: schema.users.id });
-    adminId = admin!.id;
-    console.log('Admin user created: admin@example.com / admin123');
-  } else {
-    adminId = existingAdmin[0]!.id;
-    console.log('Admin user already exists.');
+      .values({ email, passwordHash, role })
+      .returning();
+    return created!;
   }
 
-  const existingInvigilator = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, 'invigilator@example.com'))
-    .limit(1);
-
-  let invigilatorId: string;
-  if (existingInvigilator.length === 0) {
-    const [invigilator] = await db
-      .insert(schema.users)
-      .values({
-        email: 'invigilator@example.com',
-        passwordHash: invigilatorHash,
-        role: 'INVIGILATOR',
-      })
-      .returning({ id: schema.users.id });
-    invigilatorId = invigilator!.id;
-    console.log('Invigilator created: invigilator@example.com / invig123');
-  } else {
-    invigilatorId = existingInvigilator[0]!.id;
-    console.log('Invigilator already exists.');
-  }
-
-  const existingStudentUser = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, 'student@example.com'))
-    .limit(1);
-
-  let studentId: string;
-  if (existingStudentUser.length === 0) {
-    const [studentUser] = await db
-      .insert(schema.users)
-      .values({
-        email: 'student@example.com',
-        passwordHash: studentHash,
-        role: 'STUDENT',
-      })
-      .returning({ id: schema.users.id });
-
-    const [student] = await db
-      .insert(schema.students)
-      .values({
-        userId: studentUser!.id,
-        fullName: 'John Doe',
-        matricNumber: 'MAT/2024/001',
-        qrCodeHash: 'qr_demo_student_001',
-      })
-      .returning({ id: schema.students.id });
-    studentId = student!.id;
-    console.log('Student created: student@example.com / student123');
-  } else {
-    const [existingStudentRecord] = await db
+  async function ensureStudent(
+    email: string,
+    fullName: string,
+    matricNumber: string,
+    qrCodeHash: string,
+  ) {
+    const user = await ensureUser(email, studentHash, 'STUDENT');
+    const [existing] = await db
       .select()
       .from(schema.students)
-      .where(eq(schema.students.userId, existingStudentUser[0]!.id))
+      .where(eq(schema.students.userId, user.id))
       .limit(1);
-    studentId = existingStudentRecord
-      ? existingStudentRecord.id
-      : (
-          await db
-            .insert(schema.students)
-            .values({
-              userId: existingStudentUser[0]!.id,
-              fullName: 'John Doe',
-              matricNumber: 'MAT/2024/001',
-              qrCodeHash: 'qr_demo_student_001',
-            })
-            .returning({ id: schema.students.id })
-        )[0]!.id;
-    console.log('Student already exists.');
+    if (existing) {
+      return { user, student: existing };
+    }
+    const [student] = await db
+      .insert(schema.students)
+      .values({ userId: user.id, fullName, matricNumber, qrCodeHash })
+      .returning();
+    console.log(`Student created: ${email} / student123 (${fullName}, ${matricNumber})`);
+    return { user, student: student! };
   }
 
-  const existingRoom = await db
-    .select()
-    .from(schema.examRooms)
-    .where(eq(schema.examRooms.name, 'Lecture Hall A'))
-    .limit(1);
+  async function ensureInvigilator(email: string) {
+    const user = await ensureUser(email, invigilatorHash, 'INVIGILATOR');
+    console.log(`Invigilator ensured: ${email} / invig123`);
+    return user;
+  }
 
-  let roomId: string;
-  if (existingRoom.length === 0) {
+  // ---- Admin ----
+  await ensureUser('admin@example.com', adminHash, 'ADMIN');
+  console.log('Admin user ensured: admin@example.com / admin123');
+
+  // ---- Invigilators ----
+  const invigilators = await Promise.all([
+    ensureInvigilator('invigilator@example.com'),
+    ensureInvigilator('invigilator2@example.com'),
+    ensureInvigilator('invigilator3@example.com'),
+  ]);
+
+  // ---- Students ----
+  const students = await Promise.all([
+    ensureStudent('student@example.com', 'John Doe', 'MAT/2024/001', 'qr_demo_student_001'),
+    ensureStudent('student2@example.com', 'Jane Smith', 'MAT/2024/002', 'qr_demo_student_002'),
+    ensureStudent('student3@example.com', 'Michael Johnson', 'MAT/2024/003', 'qr_demo_student_003'),
+    ensureStudent('student4@example.com', 'Emily Davis', 'MAT/2024/004', 'qr_demo_student_004'),
+    ensureStudent('student5@example.com', 'David Wilson', 'MAT/2024/005', 'qr_demo_student_005'),
+    ensureStudent('student6@example.com', 'Sarah Brown', 'MAT/2024/006', 'qr_demo_student_006'),
+    ensureStudent('student7@example.com', 'Daniel Taylor', 'MAT/2024/007', 'qr_demo_student_007'),
+    ensureStudent('student8@example.com', 'Olivia Martinez', 'MAT/2024/008', 'qr_demo_student_008'),
+    ensureStudent('student9@example.com', 'James Anderson', 'MAT/2024/009', 'qr_demo_student_009'),
+    ensureStudent('student10@example.com', 'Sophia Thomas', 'MAT/2024/010', 'qr_demo_student_010'),
+  ]);
+
+  // ---- Rooms ----
+  async function ensureRoom(name: string, capacity: string, location: string) {
+    const [existing] = await db
+      .select()
+      .from(schema.examRooms)
+      .where(eq(schema.examRooms.name, name))
+      .limit(1);
+    if (existing) return existing;
     const [room] = await db
       .insert(schema.examRooms)
-      .values({
-        name: 'Lecture Hall A',
-        capacity: '100',
-        location: 'Main Campus Building A',
-      })
-      .returning({ id: schema.examRooms.id });
-    roomId = room!.id;
-    console.log('Room created: Lecture Hall A');
-  } else {
-    roomId = existingRoom[0]!.id;
-    console.log('Room already exists.');
+      .values({ name, capacity, location })
+      .returning();
+    console.log(`Room created: ${name}`);
+    return room!;
   }
 
-  const existingSession = await db
-    .select()
-    .from(schema.examSessions)
-    .where(eq(schema.examSessions.courseCode, 'MATH101'))
-    .limit(1);
+  const roomA = await ensureRoom('Lecture Hall A', '100', 'Main Campus Building A');
+  const roomB = await ensureRoom('Laboratory Block', '40', 'Science Complex');
+  const roomC = await ensureRoom('Seminar Room 2', '30', 'Administration Wing');
 
-  if (existingSession.length === 0) {
+  // ---- Enrollments (a few courses per student) ----
+  const courses = ['MATH101', 'CSC201', 'PHY102', 'ENG202', 'BIO301'];
+  async function ensureEnrollment(studentId: string, courseCode: string) {
+    const [existing] = await db
+      .select()
+      .from(schema.courseEnrollments)
+      .where(
+        and(
+          eq(schema.courseEnrollments.studentId, studentId),
+          eq(schema.courseEnrollments.courseCode, courseCode),
+        ),
+      )
+      .limit(1);
+    if (existing) return;
+    await db.insert(schema.courseEnrollments).values({ studentId, courseCode });
+  }
+
+  for (let i = 0; i < students.length; i++) {
+    const studentId = students[i]!.student.id;
+    // Each student is enrolled in 2-3 courses, rotating through the list
+    const c1 = courses[i % courses.length]!;
+    const c2 = courses[(i + 1) % courses.length]!;
+    const c3 = courses[(i + 2) % courses.length]!;
+    await ensureEnrollment(studentId, c1);
+    await ensureEnrollment(studentId, c2);
+    if (i % 2 === 0) await ensureEnrollment(studentId, c3);
+  }
+  console.log('Course enrollments ensured for all students.');
+
+  // ---- Exam sessions ----
+  async function ensureSession(
+    courseName: string,
+    courseCode: string,
+    date: string,
+    startTime: string,
+    endTime: string,
+    roomId: string,
+    status: schema.ExamSession['status'],
+    invigilatorUserIds: string[],
+  ) {
+    const [existing] = await db
+      .select()
+      .from(schema.examSessions)
+      .where(eq(schema.examSessions.courseCode, courseCode))
+      .limit(1);
+    if (existing) return existing;
+
     const [session] = await db
       .insert(schema.examSessions)
-      .values({
-        courseName: 'Mathematics 101',
-        courseCode: 'MATH101',
-        date: '2026-07-22',
-        startTime: '09:00',
-        endTime: '12:00',
-        roomId,
-        status: 'SCHEDULED',
-      })
-      .returning({ id: schema.examSessions.id });
+      .values({ courseName, courseCode, date, startTime, endTime, roomId, status })
+      .returning();
 
-    await db.insert(schema.examSessionInvigilators).values({
-      examSessionId: session!.id,
-      userId: invigilatorId,
-    });
-
-    console.log(`Exam session created: Mathematics 101 (MATH101)`);
-  } else {
-    console.log('Exam session already exists.');
+    await db.insert(schema.examSessionInvigilators).values(
+      invigilatorUserIds.map((userId) => ({
+        examSessionId: session!.id,
+        userId,
+      })),
+    );
+    console.log(`Exam session created: ${courseName} (${courseCode}) - ${status}`);
+    return session!;
   }
+
+  await ensureSession(
+    'Mathematics 101',
+    'MATH101',
+    '2026-09-03',
+    '09:00',
+    '12:00',
+    roomA.id,
+    'SCHEDULED',
+    [invigilators[0]!.id, invigilators[1]!.id],
+  );
+  await ensureSession(
+    'Computer Science 201',
+    'CSC201',
+    '2026-09-04',
+    '10:00',
+    '13:00',
+    roomB.id,
+    'SCHEDULED',
+    [invigilators[1]!.id],
+  );
+  await ensureSession(
+    'Physics 102',
+    'PHY102',
+    '2026-09-05',
+    '09:00',
+    '12:00',
+    roomC.id,
+    'SCHEDULED',
+    [invigilators[0]!.id, invigilators[2]!.id],
+  );
 
   await pool.end();
   console.log('Seed completed successfully.');

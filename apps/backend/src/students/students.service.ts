@@ -256,8 +256,40 @@ export class StudentsService {
     const archive = archiver('zip');
     archive.pipe(res);
 
-    const buffer = await this.generateQrCode(studentId);
-    archive.append(buffer, { name: 'qr-code.png' });
+    const enrollments = await this.db
+      .select({ courseCode: schema.courseEnrollments.courseCode })
+      .from(schema.courseEnrollments)
+      .where(eq(schema.courseEnrollments.studentId, studentId));
+
+    if (enrollments.length === 0) {
+      const buffer = await this.generateQrCode(studentId);
+      archive.append(buffer, { name: 'qr-code.png' });
+    } else {
+      for (const enrollment of enrollments) {
+        const courseCode = enrollment.courseCode;
+        const qrData = JSON.stringify({
+          studentId: student.id,
+          matricNumber: student.matricNumber,
+          qrCodeHash: student.qrCodeHash,
+          courseCode,
+        });
+
+        const buffer = await QRCode.toBuffer(qrData, {
+          type: 'png',
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#1a365d',
+            light: '#ffffff',
+          },
+        });
+
+        const safeName = (courseCode || 'course')
+          .replace(/[^a-zA-Z0-9-_]/g, '-')
+          .toLowerCase();
+        archive.append(buffer, { name: `${safeName}.png` });
+      }
+    }
 
     await archive.finalize();
   }

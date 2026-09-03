@@ -55,6 +55,12 @@ interface AbsentStudentRecord {
   matricNumber: string;
 }
 
+type DrillDownRecord =
+  | SessionStats
+  | StudentRecord
+  | PresentStudentRecord
+  | AbsentStudentRecord;
+
 function AdminDashboard() {
   const [activeSessions, setActiveSessions] = useState<SessionStats[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -63,7 +69,7 @@ function AdminDashboard() {
   const [totalStudents, setTotalStudents] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const [drillDownData, setDrillDownData] = useState<any[]>([]);
+  const [drillDownData, setDrillDownData] = useState<DrillDownRecord[]>([]);
   const [drillDownTitle, setDrillDownTitle] = useState('');
   const [showDrillDown, setShowDrillDown] = useState(false);
   const [drillDownLoading, setDrillDownLoading] = useState(false);
@@ -134,7 +140,7 @@ function AdminDashboard() {
     fetchAttendees(sessionId);
   };
 
-  const openDrillDown = async (title: string, data?: any[]) => {
+  const openDrillDown = async (title: string, data?: DrillDownRecord[]) => {
     setDrillDownTitle(title);
     setShowDrillDown(true);
 
@@ -324,7 +330,7 @@ function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {drillDownTitle === 'Active Sessions' &&
-                      drillDownData.map((s: SessionStats) => (
+                      (drillDownData as SessionStats[]).map((s: SessionStats) => (
                         <tr key={s.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium">{s.courseName}</td>
                           <td className="px-4 py-3 text-gray-500">{s.courseCode}</td>
@@ -336,7 +342,7 @@ function AdminDashboard() {
                       ))}
 
                     {drillDownTitle === 'Total Students' &&
-                      drillDownData.map((s: StudentRecord) => (
+                      (drillDownData as StudentRecord[]).map((s: StudentRecord) => (
                         <tr key={s.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium">
                             {s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim()}
@@ -347,7 +353,7 @@ function AdminDashboard() {
                       ))}
 
                     {(drillDownTitle === 'Total Present' || drillDownTitle === 'Total Late') &&
-                      drillDownData.map((s: PresentStudentRecord, i: number) => (
+                      (drillDownData as PresentStudentRecord[]).map((s: PresentStudentRecord, i: number) => (
                         <tr key={`${s.studentId}-${s.examSessionId}-${i}`} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium">{s.studentName}</td>
                           <td className="px-4 py-3 text-gray-500">{s.matricNumber}</td>
@@ -361,7 +367,7 @@ function AdminDashboard() {
                       ))}
 
                     {drillDownTitle === 'Absent Today' &&
-                      drillDownData.map((s: AbsentStudentRecord, i: number) => (
+                      (drillDownData as AbsentStudentRecord[]).map((s: AbsentStudentRecord, i: number) => (
                         <tr key={`${s.studentId}-${s.examSessionId}-${i}`} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium">{s.studentName}</td>
                           <td className="px-4 py-3 text-gray-500">{s.matricNumber}</td>

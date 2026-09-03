@@ -95,6 +95,26 @@ export const examSessionInvigilators = pgTable('exam_session_invigilators', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const examSessionRooms = pgTable(
+  'exam_session_rooms',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    examSessionId: uuid('exam_session_id')
+      .notNull()
+      .references(() => examSessions.id, { onDelete: 'cascade' }),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => examRooms.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    sessionRoomIdx: uniqueIndex('session_room_idx').on(
+      table.examSessionId,
+      table.roomId,
+    ),
+  }),
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Student = typeof students.$inferSelect;
@@ -143,6 +163,8 @@ export const incidents = pgTable('incidents', {
 
 export type ExamSessionInvigilator = typeof examSessionInvigilators.$inferSelect;
 export type NewExamSessionInvigilator = typeof examSessionInvigilators.$inferInsert;
+export type ExamSessionRoom = typeof examSessionRooms.$inferSelect;
+export type NewExamSessionRoom = typeof examSessionRooms.$inferInsert;
 export type Attendance = typeof attendance.$inferSelect;
 export type NewAttendance = typeof attendance.$inferInsert;
 

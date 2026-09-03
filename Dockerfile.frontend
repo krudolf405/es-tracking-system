@@ -10,6 +10,9 @@ RUN npm install && npm install @rollup/rollup-linux-x64-musl --no-save
 COPY apps/frontend ./apps/frontend
 COPY tsconfig.base.json ./
 
+ARG VITE_API_URL=http://localhost:3010
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN npm run build -w apps/frontend
 
 CMD ["npm", "run", "preview", "-w", "apps/frontend"]

@@ -108,7 +108,7 @@ function StudentDashboard() {
     }
   };
 
-  const progressConfig: Record<number, { color: string; label: string }> = {
+  const progressConfig: Record<0 | 50 | 100, { color: string; label: string }> = {
     0: { color: 'bg-gray-300', label: 'Not Started' },
     50: { color: 'bg-blue-800', label: 'In Progress — Signed In' },
     100: { color: 'bg-green-600', label: 'Completed — Signed Out' },
