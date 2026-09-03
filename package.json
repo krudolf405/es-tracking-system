@@ -23,6 +23,7 @@
     "build": "concurrently -n backend,frontend -c blue,green \"npm:backend:build\" \"npm:frontend:build\"",
     "backend:dev": "npm run start:dev -w apps/backend",
     "frontend:dev": "npm run dev -w apps/frontend",
+    "start:services": "bash scripts/ensure-services.sh",
     "db:generate": "npm run db:generate -w apps/backend",
     "db:migrate": "npm run db:migrate -w apps/backend",
     "db:migrate:all": "npm run db:migrate:all -w apps/backend",
