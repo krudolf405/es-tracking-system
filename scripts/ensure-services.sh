@@ -19,6 +19,24 @@ BACKEND_PID=""
 FRONTEND_PID=""
 CHECK_INTERVAL="${CHECK_INTERVAL:-10}"   # seconds between liveness checks
 RESTART_DELAY="${RESTART_DELAY:-4}"      # seconds to wait before restarting a dead service
+DB_HOST="${DB_HOST:-127.0.0.1}"          # database host (Docker container gateway)
+DB_PORT="${DB_PORT:-5433}"               # database host port
+
+# Wait until the PostgreSQL database is reachable, so the backend can connect at
+# boot (the Docker DB and this service start around the same time).
+wait_for_db() {
+  echo "[ensure-services] waiting for database on ${DB_HOST}:${DB_PORT} ..."
+  for i in $(seq 1 60); do
+    if (exec 3<>"/dev/tcp/$DB_HOST/$DB_PORT") 2>/dev/null; then
+      exec 3>&- 3<&-
+      echo "[ensure-services] database is reachable"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "[ensure-services] WARNING: database not reachable after 120s; starting services anyway (supervisor will retry)"
+  return 0
+}
 
 start_backend() {
   if [ -n "$BACKEND_PID" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then
@@ -46,6 +64,7 @@ start_frontend() {
 
 mkdir -p "$ROOT/logs"
 
+wait_for_db
 start_backend
 start_frontend
 
@@ -63,7 +82,7 @@ while true; do
   if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
     echo "[ensure-services] backend died; restarting in ${RESTART_DELAY}s"
     sleep "$RESTART_DELAY"
-    # Restart the port check in case it was a port conflict rather than a kill.
+    wait_for_db
     start_backend
   fi
   if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then

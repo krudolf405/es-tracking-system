@@ -225,6 +225,58 @@ Same URLs as above: frontend http://localhost:5173, backend http://localhost:301
 
 ---
 
+## Running the services reliably (auto-restart)
+
+The `npm run dev` / `npm run backend:dev` commands need an open terminal and
+stop when the shell exits. To keep the site up continuously (and survive the
+backend or frontend being killed, e.g. by the OS under memory pressure), use
+the supervisor:
+
+```bash
+npm run start:services    # starts backend + frontend from compiled build, auto-restarts if they die
+```
+
+### Auto-start at boot (systemd)
+
+On Linux, the supervisor can run as a systemd **user** service so it starts
+automatically at boot and is restarted if it ever exits:
+
+```bash
+mkdir -p ~/.config/systemd/user
+# edit ~/.config/systemd/user/exam-tracking-supervisor.service to point at your repo:
+cat > ~/.config/systemd/user/exam-tracking-supervisor.service <<'EOF'
+[Unit]
+Description=Exam Tracking System - backend & frontend supervisor
+
+[Service]
+Type=simple
+WorkingDirectory=/home/<you>/es-tracking-system
+ExecStart=/bin/bash /home/<you>/es-tracking-system/scripts/ensure-services.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --user daemon-reload
+systemctl --user enable exam-tracking-supervisor.service   # start at boot
+systemctl --user start exam-tracking-supervisor.service    # start now
+```
+
+Ensure the user services survive logout/reboot (no GUI session required):
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+The supervisor waits for the PostgreSQL database (default `127.0.0.1:5433`)
+before starting the backend, so it is safe for the DB container and the
+supervisor to start at boot in parallel. To point it at a different database,
+set `DB_HOST` / `DB_PORT` (e.g. `DB_HOST=db` inside Docker).
+
+---
+
 ## Default demo accounts (after seeding)
 
 | Role       | Email                   | Password    |
@@ -244,6 +296,7 @@ Seeded students use matric numbers `MAT/2024/001` through `MAT/2024/010`.
 | Script             | Description                                        |
 |--------------------|----------------------------------------------------|
 | `npm run dev`      | Start backend + frontend together (native)        |
+| `npm run start:services` | Run backend + frontend with auto-restart supervisor |
 | `npm run backend:dev` | Backend dev server (watch mode, :3010)         |
 | `npm run frontend:dev` | Frontend dev server (:5173)                    |
 | `npm run db:migrate:all` | Apply all SQL migrations (idempotent)        |
